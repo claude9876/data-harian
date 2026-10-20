@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pencatatan Pesanan Harian – Upload Resi + Google Sheets</title>
+<style>
+:root{--bg:#f6f6f4;--card:#fff;--tx:#1f2328;--mut:#6b7280;--bd:#e3e3df;--ac:#ee4d2d;--ok:#1a7f4b;--okb:#e2f3e9;--wn:#9a6700;--wnb:#fff3cd;--bd2:#b42318;--bdb:#fde4e1;--in:#f0f0ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141516;--card:#1d1f21;--tx:#e8e8e6;--mut:#9aa0a6;--bd:#33363a;--ok:#5fd08f;--okb:#17331f;--wn:#f0c24b;--wnb:#3a2f10;--bd2:#ff8a7a;--bdb:#3d1c18;--in:#26292c}}
+:root[data-theme="dark"]{--bg:#141516;--card:#1d1f21;--tx:#e8e8e6;--mut:#9aa0a6;--bd:#33363a;--ok:#5fd08f;--okb:#17331f;--wn:#f0c24b;--wnb:#3a2f10;--bd2:#ff8a7a;--bdb:#3d1c18;--in:#26292c}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 Arial,Helvetica,sans-serif}
+.w{max-width:1200px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 2px}h2{font-size:15px;margin:0 0 10px}.mut{color:var(--mut);font-size:12.5px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-top:14px}
+#dz{border:2px dashed var(--bd);border-radius:12px;padding:28px 12px;text-align:center;cursor:pointer;background:var(--in)}
+#dz.on{border-color:var(--ac)}#dz b{color:var(--ac)}
+button,select,input{font:inherit;color:var(--tx)}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+button.g{background:var(--in);color:var(--tx);border:1px solid var(--bd)}button:disabled{opacity:.45;cursor:default}
+input,select{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:6px 8px}
+.bar{height:8px;background:var(--in);border-radius:6px;overflow:hidden;margin-top:10px;display:none}.bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .15s}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.sp{flex:1}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:14px}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px 12px}.stat b{display:block;font-size:22px}
+.tw{overflow-x:auto;margin-top:8px}table{border-collapse:collapse;width:100%;min-width:760px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd);vertical-align:top;font-size:13px}th{color:var(--mut);font-weight:600;white-space:nowrap}
+.ch{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.baru{background:var(--okb);color:var(--ok)}.dup{background:var(--bdb);color:var(--bd2)}.cek{background:var(--wnb);color:var(--wn)}
+.late{color:var(--bd2);font-weight:700}.x{background:none;color:var(--bd2);padding:2px 8px;border:1px solid var(--bd)}
+.msg{margin-top:10px;font-size:13px}.hid{display:none}
+</style>
+</head>
+<body>
+<div class="w">
+  <h1>📦 Pencatatan Pesanan Harian</h1>
+  <div class="mut">Unggah resi Shopee/SPX (PDF) satuan atau ratusan sekaligus. Data dibaca otomatis, dicek duplikat, lalu dicatat.</div>
+
+  <div class="card">
+    <div class="row"><h2 style="margin:0">Spreadsheet</h2><span class="ch cek" id="sy">Belum terhubung</span><span class="sp"></span>
+      <button class="g" id="sg">Pengaturan</button><button class="g" id="sn">Sinkron</button></div>
+    <div id="sp" class="hid"><div class="row" style="margin-top:10px">
+      <input id="su" placeholder="URL Web App Apps Script (berakhiran /exec)" style="flex:1;min-width:260px">
+      <input id="sk" type="password" placeholder="Token" style="width:200px"><button id="ssv">Simpan dan hubungkan</button></div></div>
+  </div>
+
+  <div class="card">
+    <div id="dz"><b>Klik untuk pilih PDF</b> atau seret file ke sini<div class="mut">Boleh banyak file sekaligus. Satu PDF boleh berisi banyak halaman (satu resi per halaman).</div></div>
+    <input id="fi" type="file" accept="application/pdf,.pdf" multiple class="hid">
+    <div class="bar" id="bar"><i id="bi"></i></div>
+    <div class="msg mut" id="pm"></div>
+  </div>
+
+  <div class="card hid" id="stg">
+    <div class="row"><h2 style="margin:0">Hasil baca resi</h2><span class="sp"></span>
+      <button id="sv">Simpan</button><button class="g" id="cl">Batal</button></div>
+    <div class="msg" id="ss"></div>
+    <div class="tw"><table><thead><tr><th>Status</th><th>No. Pesanan</th><th>No. Resi</th><th>Penerima</th><th>Produk</th><th>Qty</th><th>Batas kirim</th><th>Catatan</th></tr></thead><tbody id="sb"></tbody></table></div>
+  </div>
+
+  <div class="stats" id="st"></div>
+
+  <div class="card">
+    <div class="row"><h2 style="margin:0">Data pesanan</h2><span class="sp"></span>
+      <button class="g" id="xx">Unduh Excel</button><button class="g" id="xc">Unduh CSV</button><button class="g" id="xs">Salin untuk Google Sheets</button></div>
+    <div class="row" style="margin-top:10px">
+      <label class="mut">Tanggal catat <input type="date" id="fd"></label>
+      <select id="fs"><option value="">Semua status</option><option>Perlu Dikirim</option><option>Dikirim</option><option>Selesai</option><option>Batal</option><option>Retur</option></select>
+      <input id="fq" placeholder="Cari pesanan, resi, nama, SKU" style="min-width:220px">
+      <button class="g" id="fa">Semua tanggal</button>
+    </div>
+    <div class="tw"><table><thead><tr><th>Batas kirim</th><th>No. Pesanan</th><th>No. Resi</th><th>Penerima</th><th>Produk</th><th>Qty</th><th>Harga (Rp)</th><th>Status</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+    <div class="msg mut" id="em"></div>
+  </div>
+  <div class="mut" style="margin-top:12px">Sumber data utama adalah Google Spreadsheet. Perubahan saat offline ditahan di browser dan dikirim saat Sinkron berhasil.</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const KEY='resi_orders_v1',STAT=['Perlu Dikirim','Dikirim','Selesai','Batal','Retur'];
+const d0=new Date(),iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const TODAY=iso(d0);
+let db=[],staged=[],Q=[],cfg={url:'',token:''};
+const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||d)}catch(e){return JSON.parse(d)}};
+db=ld(KEY,'[]');Q=ld(KEY+'_q','[]');cfg=Object.assign(cfg,ld(KEY+'_cfg','{}'));
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(db));localStorage.setItem(KEY+'_q',JSON.stringify(Q))}catch(e){}};
+const dk=r=>[r.pesanan,r.sku,r.variasi].join('|');
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+function lines(arr){const a=[...arr].sort((p,q)=>q.y-p.y||p.x-q.x),o=[];
+  for(const i of a){const l=o.find(l=>Math.abs(l.y-i.y)<=3);l?l.p.push(i):o.push({y:i.y,p:[i]})}
+  return o.map(l=>l.p.sort((p,q)=>p.x-q.x).map(i=>i.s).join(' '))}
+
+async function parsePage(pg){
+  const W=pg.getViewport({scale:1}).width,tc=await pg.getTextContent();
+  const it=tc.items.map(i=>({s:i.str.trim(),x:i.transform[4],y:i.transform[5],r:Math.abs(i.transform[1])>.01})).filter(i=>i.s&&!i.r);
+  const all=it.map(i=>i.s).join(' '),m=re=>{const r=all.match(re);return r?r[1]:''},f=re=>it.find(i=>re.test(i.s));
+  const pesanan=m(/No\.?\s*Pesanan\s*:?\s*([A-Z0-9]{8,})/i);
+  if(!pesanan)return null;
+  const resi=(all.match(/SPXID[0-9A-Z]+/)||[])[0]||m(/No\.?\s*Resi\s*:?\s*([A-Z0-9]{8,})/i);
+  const lP=f(/^Penerima/i),lG=f(/^Pengirim/i),lB=f(/^Berat/i),notSpx=i=>!/^SPXID/.test(i.s);
+  let penerima='';
+  if(lP){penerima=it.filter(i=>i!==lP&&Math.abs(i.y-lP.y)<=8&&i.x>=lP.x&&i.x<W*.5).sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ');
+    if(!penerima)penerima=lP.s.replace(/^Penerima\s*:?\s*/i,'')}
+  const sx=it.filter(i=>i.x>=W*.58&&i.x<W*.93&&notSpx(i)&&(!lB||i.y>lB.y+15)&&(!lG||i.y<=lG.y+10)).sort((a,b)=>b.y-a.y||a.x-b.x);
+  let pn=[],ct=[],seen=false;
+  for(const i of sx){if(/^\+?\d{8,}$/.test(i.s))seen=true;else(seen?ct:pn).push(i.s)}
+  let wil=[],yW=null;
+  if(lB){const c=it.filter(i=>i.y>lB.y+8&&i.y<lB.y+W*.13&&i.x<W*.93),g=[];
+    c.forEach(i=>{const k=g.find(k=>Math.abs(k.y-i.y)<=4);k?k.p.push(i):g.push({y:i.y,p:[i]})});
+    const cd=g.filter(k=>k.p.length>=3).sort((a,b)=>a.y-b.y)[0];
+    if(cd){wil=cd.p.sort((a,b)=>a.x-b.x).map(i=>i.s);yW=cd.y}}
+  const topY=lP?lP.y-8:1e9,botY=yW!=null?yW+4:(lB?lB.y+W*.1:-1e9);
+  const alamat=lines(it.filter(i=>i!==lP&&i.x<W*.58&&i.y<topY&&i.y>botY&&notSpx(i))).join(' ').replace(/\s+,/g,',').replace(/\s+/g,' ').trim();
+  const bm=all.match(/Berat\s*:?\s*([\d.,]+)\s*(kg|gr|g)\b/i)||all.match(/(?:^|\s)([\d.,]+)\s*(kg|gr)(?:\s|$)/i),bt=all.match(/Batas\s*Kirim\s*:?\s*(\d{2})-(\d{2})-(\d{4})/i);
+  let berat=bm?parseFloat(bm[1].replace(',','.')):'';if(bm&&/kg/i.test(bm[2]))berat*=1000;
+  const base={pesanan,resi,layanan:(f(/^(STD|REG|HEMAT|ECO|EKONOMI|CARGO|SDS|NDD|INSTANT|SAMEDAY)$/i)||{}).s||'',
+    k1:(f(/^[A-Z]{1,4}-\d{1,3}$/)||{}).s||'',k2:(f(/^[A-Z]{2,5}-[A-Z]-\d{1,3}$/)||{}).s||'',
+    penerima,alamat,kel:wil[2]||'',kec:wil[1]||'',kab:wil[0]||'',prov:alamat.split(',').pop().trim(),
+    pengirim:pn.join(' '),berat,cod:m(/COD\s*Cek\s*Dulu\s*:?\s*(Ya|Tidak)/i),batas:bt?`${bt[3]}-${bt[2]}-${bt[1]}`:''};
+  const hN=f(/^Nama Produk$/i),hS=f(/^SKU$/i),hV=f(/^Variasi$/i),hQ=f(/^Qty$/i);let pr=[];
+  if(hN&&hS&&hV&&hQ){
+    const lp=f(/^Pesan:/i),reg=it.filter(i=>i.y<hN.y-2&&(!lp||i.y>lp.y+2)&&notSpx(i));
+    const st=reg.filter(i=>i.x<hN.x-2&&/^\d+$/.test(i.s)).sort((a,b)=>b.y-a.y),bk=st.length?st.map(()=>[]):[[]];
+    reg.forEach(i=>{if(i.x<hN.x-2)return;let k=0;
+      if(st.length){k=-1;st.forEach((s,j)=>{if(s.y>=i.y-3)k=j});if(k<0)k=0}
+      bk[k].push({...i,c:i.x>=hQ.x-3?'q':i.x>=hV.x-3?'v':i.x>=hS.x-3?'s':'n'})});
+    pr=bk.map(b=>{const g=c=>lines(b.filter(i=>i.c===c)).join(' ');const v=g('v'),pv=v.split(',').map(x=>x.trim());
+      return{produk:g('n'),sku:g('s'),variasi:v,warna:pv[0]||'',ukuran:pv.slice(1).join(','),qty:parseInt(g('q'))||0}})}
+  if(!pr.length)pr=[{produk:'',sku:'',variasi:'',warna:'',ukuran:'',qty:0}];
+  return pr.map(p=>{const r={...base,...p},w=[];
+    if(!r.resi)w.push('resi kosong');if(!r.penerima)w.push('penerima kosong');if(!r.alamat)w.push('alamat kosong');
+    if(!r.produk)w.push('produk kosong');if(!r.qty)w.push('qty kosong');if(!r.batas)w.push('batas kirim kosong');if(!r.kab)w.push('wilayah tidak terbaca');
+    return{r,w}})}
+
+async function handle(files){
+  files=[...files].filter(f=>/\.pdf$/i.test(f.name)||f.type==='application/pdf');
+  if(!files.length)return;
+  staged=[];const errs=[],seen=new Set(db.map(dk));let pages=0,skip=0;
+  $('bar').style.display='block';
+  for(let n=0;n<files.length;n++){
+    const fl=files[n];$('pm').textContent=`Membaca ${n+1}/${files.length}: ${fl.name}`;
+    try{
+      const pdf=await pdfjsLib.getDocument({data:await fl.arrayBuffer()}).promise;
+      for(let p=1;p<=pdf.numPages;p++){
+        pages++;const res=await parsePage(await pdf.getPage(p));
+        if(!res){skip++;continue}
+        for(const x of res){x.r.file=fl.name;x.r.hal=p;const k=dk(x.r);
+          x.st=seen.has(k)?'dup':x.w.length?'cek':'baru';seen.add(k);staged.push(x)}
+        if(p%5===0)await new Promise(r=>setTimeout(r))}
+      pdf.destroy()
+    }catch(e){errs.push(fl.name+': '+(e.message||'gagal dibaca'))}
+    $('bi').style.width=((n+1)/files.length*100)+'%';await new Promise(r=>setTimeout(r))}
+  $('bar').style.display='none';$('bi').style.width='0';
+  $('pm').textContent=`Selesai: ${files.length} file, ${pages} halaman dibaca.`+(skip?` ${skip} halaman dilewati (bukan resi).`:'')+(errs.length?` Gagal: ${errs.join('; ')}`:'');
+  renderStaged()}
+
+function renderStaged(){
+  $('stg').classList.toggle('hid',!staged.length);
+  const c={baru:0,cek:0,dup:0};staged.forEach(x=>c[x.st]++);
+  $('ss').innerHTML=`<span class="ch baru">${c.baru} baru</span> <span class="ch cek">${c.cek} perlu dicek</span> <span class="ch dup">${c.dup} duplikat (dilewati)</span>`;
+  $('sv').textContent=`Simpan ${c.baru+c.cek} data`;$('sv').disabled=!(c.baru+c.cek);
+  $('sb').innerHTML=staged.map(x=>{const r=x.r,L={baru:'Baru',cek:'Cek',dup:'Duplikat'}[x.st];
+    return`<tr><td><span class="ch ${x.st}">${L}</span></td><td>${esc(r.pesanan)}</td><td>${esc(r.resi)}</td><td>${esc(r.penerima)}<div class="mut">${esc([r.kel,r.kec,r.kab].filter(Boolean).join(', '))}</div></td><td>${esc(r.produk)}<div class="mut">${esc(r.sku)} · ${esc(r.variasi)}</div></td><td>${r.qty}</td><td>${esc(r.batas)}</td><td class="mut">${esc(x.w.join(', '))}<div>${esc(r.file)} h.${r.hal}</div></td></tr>`}).join('')}
+
+$('sv').onclick=()=>{
+  const add=staged.filter(x=>x.st!=='dup').map(x=>({...x.r,id:dk(x.r),tgl:TODAY,harga:'',status:'Perlu Dikirim',cek:x.st==='cek'?x.w.join(', '):''}));
+  db=db.concat(add);Q.push({op:'add',rows:add});persist();flush();staged=[];renderStaged();$('pm').textContent=`${add.length} data tersimpan.`;$('fd').value=TODAY;render()};
+$('cl').onclick=()=>{staged=[];renderStaged();$('pm').textContent=''};
+
+function filtered(){
+  const d=$('fd').value,s=$('fs').value,q=$('fq').value.toLowerCase().trim();
+  return db.filter(r=>(!d||r.tgl===d)&&(!s||r.status===s)&&(!q||[r.pesanan,r.resi,r.penerima,r.sku,r.produk].join(' ').toLowerCase().includes(q)))}
+function render(){
+  const a=filtered(),ship=a.filter(r=>r.status==='Perlu Dikirim'),late=ship.filter(r=>r.batas&&r.batas<=TODAY);
+  $('st').innerHTML=[['Total pesanan',a.length],['Total qty (pcs)',a.reduce((t,r)=>t+(+r.qty||0),0)],['Perlu dikirim',ship.length],['Jatuh tempo hari ini / lewat',late.length],['Perlu dicek',a.filter(r=>r.cek).length]]
+    .map(([l,v])=>`<div class="stat"><span class="mut">${l}</span><b>${v}</b></div>`).join('');
+  $('em').textContent=a.length?'':'Belum ada data. Unggah resi untuk memulai.';
+  $('tb').innerHTML=a.slice().sort((x,y)=>(x.batas||'').localeCompare(y.batas||'')).map(r=>{
+    const lt=r.status==='Perlu Dikirim'&&r.batas&&r.batas<=TODAY;
+    return`<tr data-id="${r.id}"><td class="${lt?'late':''}">${esc(r.batas)}</td><td>${esc(r.pesanan)}</td><td>${esc(r.resi)}</td><td>${esc(r.penerima)}<div class="mut">${esc([r.kec,r.kab].filter(Boolean).join(', '))}</div></td><td>${esc(r.produk)}<div class="mut">${esc(r.sku)} · ${esc(r.variasi)}</div>${r.cek?`<div class="ch cek">cek: ${esc(r.cek)}</div>`:''}</td><td>${r.qty}</td><td><input data-f="harga" type="number" min="0" value="${esc(r.harga)}" style="width:100px"></td><td><select data-f="status">${STAT.map(s=>`<option${s===r.status?' selected':''}>${s}</option>`).join('')}</select></td><td><button class="x" data-del="1" title="Hapus">✕</button></td></tr>`}).join('')}
+$('tb').addEventListener('change',e=>{const t=e.target,tr=t.closest('tr');if(!tr||!t.dataset.f)return;
+  const r=db.find(x=>x.id===tr.dataset.id);r[t.dataset.f]=t.value;Q.push({op:'update',id:r.id,patch:{[t.dataset.f]:t.value}});persist();flush();render()});
+$('tb').addEventListener('click',e=>{if(!e.target.dataset.del)return;const id=e.target.closest('tr').dataset.id;
+  if(e.target.dataset.arm!==id){e.target.dataset.arm=id;e.target.textContent='Yakin?';return}
+  db=db.filter(x=>x.id!==id);Q.push({op:'delete',id});persist();flush();render()});
+['fd','fs','fq'].forEach(i=>$(i).addEventListener('input',render));
+$('fa').onclick=()=>{$('fd').value='';render()};
+
+const HEAD=['No','Tanggal Catat','Batas Kirim','No. Pesanan','No. Resi','Layanan','Kode Sortir 1','Kode Sortir 2','Penerima','Alamat Lengkap','Kelurahan','Kecamatan','Kab/Kota','Provinsi','Pengirim','Nama Produk','SKU','Variasi (Shopee)','Warna','Ukuran','Qty','Berat (gr)','COD','Harga Jual (Rp)','Status','Catatan','Cek Data'];
+const dmy=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')?v.split('-').reverse().join('-'):(v||'');
+const cekOf=r=>!r.pesanan?'':(!/^SPXID/.test(r.resi||'')||(r.resi||'').length!==17)?'CEK NO. RESI':(!r.penerima||!r.alamat||!r.berat||!(+r.qty>0))?'DATA KURANG':'OK';
+const cell=r=>[dmy(r.tgl),dmy(r.batas),r.pesanan,r.resi,r.layanan,r.k1,r.k2,r.penerima,r.alamat,r.kel,r.kec,r.kab,r.prov,r.pengirim,r.produk,r.sku,r.variasi,r.warna,r.ukuran,+r.qty||0,r.berat===''?'':+r.berat,r.cod,(r.harga===''||r.harga==null)?'':+r.harga,r.status,r.cek||''];
+const rowOf=(r,i)=>[i+1,...cell(r),cekOf(r)];
+async function save(name,data){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=name;a.click()}
+$('xx').onclick=()=>{const a=filtered();if(!a.length||!window.XLSX)return;
+  const ws=XLSX.utils.aoa_to_sheet([HEAD,...a.map(rowOf)]);ws['!cols']=HEAD.map((h,i)=>({wch:i===9||i===15?44:14}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pencatatan Harian');
+  save(`pencatatan-pesanan-${$('fd').value||'semua'}.xlsx`,XLSX.write(wb,{type:'array',bookType:'xlsx'}))};
+$('xc').onclick=()=>{const a=filtered();if(!a.length)return;
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  save(`pencatatan-pesanan-${$('fd').value||'semua'}.csv`,'\ufeff'+[HEAD,...a.map(rowOf)].map(r=>r.map(q).join(',')).join('\r\n'))};
+
+$('xs').onclick=async()=>{const a=filtered();if(!a.length)return;
+  const t=a.map(r=>cell(r).map(v=>String(v==null?'':v).replace(/[\t\r\n]+/g,' ')).join('\t')).join('\n');
+  try{await navigator.clipboard.writeText(t)}catch(e){const x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}
+  $('em').textContent=`${a.length} baris disalin (kolom B sampai Z). Di Google Sheets, klik sel B pada baris kosong pertama lalu tempel. Salin rumus kolom No dan Cek Data ke bawah.`};
+const dz=$('dz'),fi=$('fi');
+dz.onclick=()=>fi.click();fi.onchange=()=>{handle(fi.files);fi.value=''};
+['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('on')}));
+['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('on')}));
+dz.addEventListener('drop',e=>handle(e.dataTransfer.files));
+const setSync=(t,c)=>{$('sy').textContent=t;$('sy').className='ch '+(c==='ok'?'baru':c==='bad'?'dup':'cek')};
+async function api(post,body){
+  const r=await fetch(post?cfg.url:cfg.url+'?action=list&token='+encodeURIComponent(cfg.token)+'&t='+Date.now(),
+    post?{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}:{});
+  const j=await r.json();if(!j.ok)throw new Error(j.error||'gagal');return j}
+let busy=false;
+async function flush(){
+  if(!cfg.url){setSync('Mode lokal: belum terhubung ke spreadsheet');return}
+  if(busy)return;busy=true;setSync('Menyinkronkan…');let err=null;
+  try{
+    while(Q.length){const n=Q.length,j=await api(true,{token:cfg.token,ops:Q.slice(0,n)});Q.splice(0,n);persist();
+      if(j.skipped)$('pm').textContent=`Spreadsheet: ${j.added} baris ditambah, ${j.skipped} duplikat dilewati.`}
+    db=(await api(false)).rows;persist();render();
+  }catch(e){err=e}
+  busy=false;
+  err?setSync('Gagal sinkron: '+err.message+(Q.length?` · ${Q.length} perubahan tertunda`:''),'bad'):setSync('Tersambung ke spreadsheet · '+db.length+' baris','ok')}
+$('sg').onclick=()=>$('sp').classList.toggle('hid');
+$('sn').onclick=flush;
+$('su').value=cfg.url;$('sk').value=cfg.token;
+$('ssv').onclick=()=>{cfg.url=$('su').value.trim();cfg.token=$('sk').value.trim();
+  try{localStorage.setItem(KEY+'_cfg',JSON.stringify(cfg))}catch(e){}$('sp').classList.add('hid');flush()};
+$('fd').value=TODAY;render();flush();
+</script>
+</body>
+</html>
